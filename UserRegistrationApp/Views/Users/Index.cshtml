@@ -1,0 +1,140 @@
+@{
+    ViewData["Title"] = "Registered Users";
+}
+
+<h2>@ViewData["Title"]</h2>
+
+<p>
+    <a asp-action="Create" class="btn btn-primary">Create New</a>
+</p>
+
+<div class="container-fluid card">
+    <div class="card-body">
+        @Html.AntiForgeryToken()
+        <div class="row mb-3">
+            <div class="col-md-4">
+                <input type="text" id="nameSearch" class="form-control" placeholder="Enter employee name">
+            </div>
+            <div class="col-md-3">
+                <select id="genderSearch" class="form-control">
+                    <option value="">Select Gender</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select id="stateSearch" class="form-control" asp-items="ViewBag.States">
+                     <option value="">Select State</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button id="searchBtn" class="btn btn-info">Search</button>
+            </div>
+        </div>
+
+        <table id="usersTable" class="table table-striped table-bordered" style="width:100%">
+            <thead>
+                <tr>
+                    <th>Reg. No.</th>
+                    <th>Photo</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Gender</th>
+                    <th>State</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+        </table>
+    </div>
+</div>
+
+
+@section Scripts {
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap4.min.css">
+    <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+    <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap4.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css" />
+
+    <script>
+        $(document).ready(function () {
+            var table = $('#usersTable').DataTable({
+                "processing": true,
+                "serverSide": true,
+                "filter": true,
+                "ajax": {
+                    "url": "/Users/GetUsers",
+                    "type": "POST",
+                    "datatype": "json",
+                    "data": function (d) {
+                        d.nameSearch = $('#nameSearch').val();
+                        d.genderSearch = $('#genderSearch').val();
+                        d.stateSearch = $('#stateSearch').val();
+                        // Add AntiForgeryToken
+                        d.__RequestVerificationToken = $('input[name="__RequestVerificationToken"]').val();
+                    }
+                },
+                "columnDefs": [{
+                    "targets": [0],
+                    "visible": true,
+                    "searchable": false
+                }],
+                "columns": [
+                    { "data": "userId", "name": "UserId", "autoWidth": true },
+                    { 
+                        "data": "photoPath", "name": "PhotoPath", "orderable": false, "autoWidth": true,
+                        "render": function(data, type, row, meta) {
+                            // The server already sends the full img tag
+                            return data;
+                        }
+                    },
+                    { 
+                        "data": "name", "name": "Name", "autoWidth": true,
+                         "render": function(data, type, row, meta) {
+                            // The server already sends the full anchor tag
+                            return data;
+                        }
+                    },
+                    { "data": "email", "name": "Email", "autoWidth": true },
+                    { "data": "gender", "name": "Gender", "autoWidth": true },
+                    { "data": "stateName", "name": "StateName", "autoWidth": true },
+                    {
+                        "data": "userId", "name": "Actions", "orderable": false,
+                        "render": function (data, type, row, meta) {
+                            return `<a href="/Users/Edit/${data}" class="btn btn-sm btn-primary">Edit</a> 
+                                    <button class="btn btn-sm btn-danger delete-btn" data-id="${data}">Delete</button>`;
+                        }
+                    }
+                ]
+            });
+
+            $('#searchBtn').on('click', function () {
+                table.draw();
+            });
+
+            $('#usersTable').on('click', '.delete-btn', function () {
+                var id = $(this).data('id');
+                if (confirm('Are you sure you want to delete this user?')) {
+                    $.ajax({
+                        url: `/Users/Delete/${id}`,
+                        type: 'POST',
+                        data: {
+                             __RequestVerificationToken: $('input[name="__RequestVerificationToken"]').val()
+                        },
+                        success: function (response) {
+                            if (response.success) {
+                                toastr.success(response.message);
+                                table.draw(); // Refresh the table
+                            } else {
+                                toastr.error(response.message);
+                            }
+                        },
+                        error: function () {
+                            toastr.error('An error occurred while deleting the user.');
+                        }
+                    });
+                }
+            });
+        });
+    </script>
+} 

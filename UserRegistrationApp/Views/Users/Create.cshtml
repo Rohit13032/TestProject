@@ -1,0 +1,163 @@
+@model UserRegistrationApp.Models.User
+
+@{
+    ViewData["Title"] = "User Registration";
+}
+
+<h2>@ViewData["Title"]</h2>
+
+<hr />
+<div class="row">
+    <div class="col-md-8">
+        <form id="registrationForm" asp-action="Create" enctype="multipart/form-data">
+            @Html.AntiForgeryToken()
+            <div id="form-errors" class="text-danger"></div>
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+            <div class="form-group">
+                <label asp-for="Name" class="control-label"></label>
+                <input asp-for="Name" class="form-control" />
+                <span asp-validation-for="Name" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Gender" class="control-label"></label><br />
+                <input type="radio" asp-for="Gender" value="Male" /> Male
+                <input type="radio" asp-for="Gender" value="Female" /> Female
+                <span asp-validation-for="Gender" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="DateOfBirth" class="control-label"></label>
+                <input asp-for="DateOfBirth" class="form-control" type="date" />
+                <span asp-validation-for="DateOfBirth" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Email" class="control-label"></label>
+                <input asp-for="Email" class="form-control" />
+                <span asp-validation-for="Email" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Mobile" class="control-label"></label>
+                <input asp-for="Mobile" class="form-control" />
+                <span asp-validation-for="Mobile" class="text-danger"></span>
+            </div>
+            
+            <div class="form-group">
+                <label asp-for="Phone" class="control-label"></label>
+                <input asp-for="Phone" class="form-control" />
+                <span asp-validation-for="Phone" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="StateId" class="control-label">State</label>
+                <select asp-for="StateId" class="form-control" asp-items="ViewBag.States">
+                    <option value="">-- Select State --</option>
+                </select>
+                <span asp-validation-for="StateId" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="CityId" class="control-label">City</label>
+                <select asp-for="CityId" class="form-control"></select>
+                <span asp-validation-for="CityId" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label class="control-label">Hobbies</label><br />
+                <input type="checkbox" name="Hobbies" value="Chess" /> Chess
+                <input type="checkbox" name="Hobbies" value="Cricket" /> Cricket
+                <input type="checkbox" name="Hobbies" value="Football" /> Football
+                <input type="checkbox" name="Hobbies" value="Hockey" /> Hockey
+            </div>
+
+            <div class="form-group">
+                <label class="control-label">Photo</label>
+                <input type="file" name="Photo" class="form-control" />
+            </div>
+            
+            <div class="form-group">
+                <div class="checkbox">
+                    <label>
+                        <input asp-for="TermsAgreed" /> I agree to Terms and Conditions
+                    </label>
+                </div>
+                <span asp-validation-for="TermsAgreed" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <input type="submit" value="Submit" class="btn btn-primary" />
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css" />
+
+    <script type="text/javascript">
+        $(document).ready(function () {
+            $('#StateId').change(function () {
+                var stateId = $(this).val();
+                var citySelect = $('#CityId');
+                citySelect.empty();
+                citySelect.append($('<option/>', { value: '', text: 'Select City' }));
+
+                if (stateId) {
+                    $.ajax({
+                        type: 'GET',
+                        url: '@Url.Action("GetCities", "Users")',
+                        data: { stateId: stateId },
+                        success: function (cities) {
+                            if (cities.length > 0) {
+                                $.each(cities, function (i, city) {
+                                    citySelect.append($('<option/>', { value: city.value, text: city.text }));
+                                });
+                            }
+                        },
+                        error: function() {
+                             toastr.error('Could not load cities.');
+                        }
+                    });
+                }
+            });
+
+            $('#registrationForm').on('submit', function(e) {
+                e.preventDefault(); // Stop the normal form submission
+
+                // Clear previous errors
+                $('.text-danger').text('');
+
+                var form = $(this);
+                var formData = new FormData(form[0]);
+
+                $.ajax({
+                    url: form.attr('action'),
+                    type: 'POST',
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    success: function(response) {
+                        if (response.success) {
+                            toastr.success('Registration successful! Redirecting...');
+                            window.location.href = response.redirectUrl;
+                        } else {
+                            toastr.error('Please correct the validation errors.');
+                            $.each(response.errors, function(key, value) {
+                                var span = $('[data-valmsg-for="' + key + '"]');
+                                span.text(value.join(', '));
+                            });
+                        }
+                    },
+                    error: function() {
+                        toastr.error('An unexpected error occurred. Please try again.');
+                    }
+                });
+            });
+        });
+    </script>
+} 
