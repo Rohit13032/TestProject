@@ -41,7 +41,6 @@
                     <th>Email</th>
                     <th>Gender</th>
                     <th>State</th>
-                    <th>Actions</th>
                 </tr>
             </thead>
         </table>
@@ -98,13 +97,6 @@
                     { "data": "email", "name": "Email", "autoWidth": true },
                     { "data": "gender", "name": "Gender", "autoWidth": true },
                     { "data": "stateName", "name": "StateName", "autoWidth": true },
-                    {
-                        "data": "userId", "name": "Actions", "orderable": false,
-                        "render": function (data, type, row, meta) {
-                            return `<a href="/Users/Edit/${data}" class="btn btn-sm btn-primary">Edit</a> 
-                                    <button class="btn btn-sm btn-danger delete-btn" data-id="${data}">Delete</button>`;
-                        }
-                    }
                 ]
             });
 
@@ -112,27 +104,32 @@
                 table.draw();
             });
 
-            $('#usersTable').on('click', '.delete-btn', function () {
-                var id = $(this).data('id');
-                if (confirm('Are you sure you want to delete this user?')) {
-                    $.ajax({
-                        url: `/Users/Delete/${id}`,
-                        type: 'POST',
-                        data: {
-                             __RequestVerificationToken: $('input[name="__RequestVerificationToken"]').val()
-                        },
-                        success: function (response) {
-                            if (response.success) {
-                                toastr.success(response.message);
-                                table.draw(); // Refresh the table
-                            } else {
-                                toastr.error(response.message);
-                            }
-                        },
-                        error: function () {
-                            toastr.error('An error occurred while deleting the user.');
-                        }
-                    });
+            // Real-time search functionality
+            var searchTimeout;
+            
+            // Name search with delay
+            $('#nameSearch').on('input', function() {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(function() {
+                    table.draw();
+                }, 500); // 500ms delay
+            });
+
+            // Gender search (immediate)
+            $('#genderSearch').on('change', function() {
+                table.draw();
+            });
+
+            // State search (immediate)
+            $('#stateSearch').on('change', function() {
+                table.draw();
+            });
+
+            // Clear search functionality
+            $('#nameSearch').on('keyup', function(e) {
+                if (e.key === 'Escape') {
+                    $(this).val('');
+                    table.draw();
                 }
             });
         });

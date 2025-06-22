@@ -1,9 +1,10 @@
 using System;
 using System.ComponentModel.DataAnnotations;
+using System.Collections.Generic;
 
 namespace UserRegistrationApp.Models
 {
-    public partial class User
+    public partial class User : IValidatableObject
     {
         [Key]
         public int UserId { get; set; }
@@ -22,14 +23,16 @@ namespace UserRegistrationApp.Models
         [EmailAddress]
         public string? Email { get; set; }
 
+        [StringLength(15)]
         public string? Mobile { get; set; }
 
+        [StringLength(15)]
         public string? Phone { get; set; }
 
-        [Range(1, int.MaxValue, ErrorMessage = "Please select a state.")]
+        [Range(1, int.MaxValue, ErrorMessage = "The State field is required.")]
         public int StateId { get; set; }
 
-        [Range(1, int.MaxValue, ErrorMessage = "Please select a city.")]
+        [Range(1, int.MaxValue, ErrorMessage = "The City field is required.")]
         public int CityId { get; set; }
 
         public string? Hobbies { get; set; }
@@ -41,5 +44,15 @@ namespace UserRegistrationApp.Models
 
         public virtual State? State { get; set; }
         public virtual City? City { get; set; }
+
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            if (string.IsNullOrWhiteSpace(Mobile) && string.IsNullOrWhiteSpace(Phone))
+            {
+                yield return new ValidationResult(
+                    "Either Mobile Number or Phone Number is required.",
+                    new[] { nameof(Mobile), nameof(Phone) });
+            }
+        }
     }
 } 

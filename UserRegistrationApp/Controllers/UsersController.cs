@@ -46,8 +46,31 @@ namespace UserRegistrationApp.Controllers
 
             if (ModelState.IsValid)
             {
+                // Check for duplicate user (based on email if provided, or name + mobile combination)
+                bool isDuplicate = false;
+                if (!string.IsNullOrEmpty(user.Email))
+                {
+                    isDuplicate = await _context.Users.AnyAsync(u => u.Email == user.Email);
+                }
+                else if (!string.IsNullOrEmpty(user.Mobile))
+                {
+                    isDuplicate = await _context.Users.AnyAsync(u => u.Name == user.Name && u.Mobile == user.Mobile);
+                }
+
+                if (isDuplicate)
+                {
+                    return Json(new { success = false, errors = new Dictionary<string, string[]> { { "Email", new[] { "A user with this email already exists." } } } });
+                }
+
                 if (Photo != null)
                 {
+                    // Validate file type
+                    var allowedTypes = new[] { "image/jpeg", "image/jpg", "image/png" };
+                    if (!allowedTypes.Contains(Photo.ContentType.ToLower()))
+                    {
+                        return Json(new { success = false, errors = new Dictionary<string, string[]> { { "Photo", new[] { "Please upload only JPG or PNG files." } } } });
+                    }
+
                     string uploadsDir = Path.Combine(_webHostEnvironment.WebRootPath, "images/photos");
                     if (!Directory.Exists(uploadsDir))
                     {
@@ -181,6 +204,43 @@ namespace UserRegistrationApp.Controllers
             return Json(new { success = true, message = "User deleted successfully." });
         }
 
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteAll()
+        {
+            try
+            {
+                // Get all users to delete their photo files
+                var allUsers = await _context.Users.ToListAsync();
+                
+                // Delete photo files for all users
+                foreach (var user in allUsers)
+                {
+                    if (!string.IsNullOrEmpty(user.PhotoPath))
+                    {
+                        var photoPath = Path.Combine(_webHostEnvironment.WebRootPath, user.PhotoPath.TrimStart('/'));
+                        if (System.IO.File.Exists(photoPath))
+                        {
+                            System.IO.File.Delete(photoPath);
+                        }
+                    }
+                }
+
+                // Delete all users
+                _context.Users.RemoveRange(allUsers);
+                await _context.SaveChangesAsync();
+
+                // Reset identity seed to start from 1
+                await _context.Database.ExecuteSqlRawAsync("DBCC CHECKIDENT ('Users', RESEED, 0)");
+
+                return Json(new { success = true, message = "All records deleted successfully. Registration numbers will start from 1 for new records." });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"An error occurred: {ex.Message}" });
+            }
+        }
+
         // GET: Users/Edit/5
         public async Task<IActionResult> Edit(int? id)
         {
@@ -215,12 +275,19 @@ namespace UserRegistrationApp.Controllers
             {
                 try
                 {
+                    // Get the existing user to preserve the photo path if no new photo is uploaded
+                    var existingUser = await _context.Users.FindAsync(id);
+                    if (existingUser == null)
+                    {
+                        return NotFound();
+                    }
+
                     if (Photo != null)
                     {
                         // Delete old photo if it exists
-                        if (!string.IsNullOrEmpty(user.PhotoPath))
+                        if (!string.IsNullOrEmpty(existingUser.PhotoPath))
                         {
-                             var oldPhotoPath = Path.Combine(_webHostEnvironment.WebRootPath, user.PhotoPath.TrimStart('/'));
+                             var oldPhotoPath = Path.Combine(_webHostEnvironment.WebRootPath, existingUser.PhotoPath.TrimStart('/'));
                              if (System.IO.File.Exists(oldPhotoPath))
                              {
                                  System.IO.File.Delete(oldPhotoPath);
@@ -240,6 +307,11 @@ namespace UserRegistrationApp.Controllers
                             await Photo.CopyToAsync(fileStream);
                         }
                         user.PhotoPath = "/images/photos/" + uniqueFileName;
+                    }
+                    else
+                    {
+                        // Keep the existing photo path if no new photo is uploaded
+                        user.PhotoPath = existingUser.PhotoPath;
                     }
 
                     _context.Update(user);
